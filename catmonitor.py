@@ -6,7 +6,9 @@ import os, oursql, sqlite3, re
 from progressbar import ProgressBar, Percentage, Bar, ETA, SimpleProgress, Counter
 from datetime import datetime
 from danmicholoparser import TemplateEditor
-from wp_private import botlogin
+from wp_private import botlogin, mailfrom, mailto
+import logging
+import logging.handlers
 
 template_name = u'Bruker:DanmicholoBot/Kategoriovervåkning'
 edit_summary = 'Oppdaterer liste over nye artikler'
@@ -18,6 +20,26 @@ maxcats = 10000
 sql = sqlite3.connect('catmonitor.db')
 no = mwclient.Site(host)
 no.login(*botlogin)
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('[%(asctime)s %(levelname)s] %(message)s')
+
+smtp_handler = logging.handlers.SMTPHandler( mailhost = ('localhost', 25),
+                fromaddr = mailfrom, toaddrs = mailto, 
+                subject=u"[toolserver] CatWatchBot crashed!")
+smtp_handler.setLevel(logging.ERROR)
+logger.addHandler(smtp_handler)
+
+file_handler = logging.FileHandler('catmonitor.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+#console_handler = logging.StreamHandler()
+#console_handler.setLevel(logging.INFO)
+#console_handler.setFormatter(formatter)
+#logger.addHandler(console_handler)
 
 def get_cached(catname):
     cur = sql.cursor()
@@ -33,8 +55,8 @@ def get_live(catname, exceptions):
             read_default_file=os.path.expanduser('~/.my.cnf'))   
     cur = db.cursor()
 
-    pbar = ProgressBar(maxval=maxcats, widgets=['Categories: ', Counter()])
-    pbar.start()
+    #pbar = ProgressBar(maxval=maxcats, widgets=['Categories: ', Counter()])
+    #pbar.start()
 
     cats = [catname];
     articles = [];
@@ -50,16 +72,16 @@ def get_live(catname, exceptions):
                 pg = row[0].decode('utf-8')
                 #if pg not in articles: expensive!
                 articles.append(pg)
-        if len(cats) > pbar.maxval:
+        if len(cats) > maxcats:
             raise StandardError("Too many categories. We should probably add exclusions")
         #    pbar.maxval = len(cats)
-        pbar.update(len(cats))
-    pbar.maxval = len(cats)
-    pbar.finish()
+        #pbar.update(len(cats))
+    #pbar.maxval = len(cats)
+    #pbar.finish()
 
-    print "Found %d cats, %d articles" % (len(cats), len(articles))
     articles = list(set(articles))
-    print "of which %d unique articles" % (len(articles))
+    logger.info(" -> Found %d cats, %d articles", len(cats), len(articles))
+    #logger.info("of which %d unique articles", len(articles))
     cur.close()
     db.close()
     return articles
@@ -73,7 +95,7 @@ def update_cache(cached, live):
     added = list(live_set.difference(cached_set))
     removed = list(cached_set.difference(live_set))
 
-    print "%d articles added, %d articles removed" % (len(added), len(removed))
+    logger.info(" -> %d articles added, %d articles removed", len(added), len(removed))
     
     cur = sql.cursor()
     for article in removed:
@@ -125,10 +147,17 @@ def makelist(catname, txt, maxitems, exceptions):
     txt = txt[:posstart] + ntxt + txt[posend:]
     return txt
 
+def total_seconds(td):
+    # for backwards compability. td is a timedelta object
+    return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
 
+runstart = datetime.now()
+import platform
+pv = platform.python_version()
+logger.info('running Python %s' % (pv))
 template = no.pages[template_name]
 for page in template.embeddedin():
-    print page.page_title
+    logger.info("Checking: %s", page.page_title)
     #if page.page_title != u'DanmicholoBot/Sandkasse2':
     #    continue
     txt = page.edit()
@@ -153,4 +182,6 @@ for page in template.embeddedin():
         txt = makelist(catname, txt, maxitems = antall, exceptions = utelat)
         page.save(txt, edit_summary)
 
-
+runend = datetime.now()
+runtime = total_seconds(runend - runstart)
+logger.info('Complete, runtime was %.f seconds.' % (runtime))
