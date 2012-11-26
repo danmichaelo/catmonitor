@@ -13,6 +13,7 @@ edit_summary = 'Oppdaterer liste over nye artikler'
 host = 'no.wikipedia.org'
 mysql_host = 'nowiki-p.rrdb.toolserver.org'
 mysql_db = 'nowiki_p'
+maxcats = 10000
 
 sql = sqlite3.connect('catmonitor.db')
 no = mwclient.Site(host)
@@ -26,13 +27,12 @@ def get_cached(catname):
     cur.close()
     return articles
 
-def get_live(catname):
+def get_live(catname, exceptions):
     # The text in the DB is UTF-8, but identified as latin1, so we need to be careful
     db = oursql.connect(host=mysql_host, db=mysql_db, charset=None, use_unicode=False,
             read_default_file=os.path.expanduser('~/.my.cnf'))   
     cur = db.cursor()
 
-    maxcats = 10000
     pbar = ProgressBar(maxval=maxcats, widgets=['Categories: ', Counter()])
     pbar.start()
 
@@ -43,12 +43,16 @@ def get_live(catname):
         for row in cur.fetchall():
             if row[1] == 'subcat':
                 cat = row[0].decode('utf-8')
-                if cat not in cats:
+                if cat not in exceptions and cat not in cats:
                     cats.append(cat)
+                    #print cat
             elif row[1] == 'page':
                 pg = row[0].decode('utf-8')
                 #if pg not in articles: expensive!
                 articles.append(pg)
+        if len(cats) > pbar.maxval:
+            raise StandardError("Too many categories. We should probably add exclusions")
+        #    pbar.maxval = len(cats)
         pbar.update(len(cats))
     pbar.maxval = len(cats)
     pbar.finish()
@@ -73,7 +77,7 @@ def update_cache(cached, live):
     
     cur = sql.cursor()
     for article in removed:
-        cur.execute(u'DELETE FROM articles WHERE category=? AND article=? LIMIT 1', [catname, article])
+        cur.execute(u'DELETE FROM articles WHERE category=? AND article=?', [catname, article])
     
     for article in added:
         cur.execute(u'INSERT INTO articles (category, article, date_added) VALUES (?,?,?)', [catname, article, now])
@@ -81,7 +85,7 @@ def update_cache(cached, live):
     sql.commit()
     cur.close()
 
-def makelist(catname, txt, maxitems):
+def makelist(catname, txt, maxitems, exceptions):
     if type(catname) != unicode:
         raise StandardError("catname must be unicode object")
 
@@ -90,17 +94,20 @@ def makelist(catname, txt, maxitems):
         raise StandardError("maxitems: invalid value")
     
     cached = get_cached(catname)
-    live = get_live(catname)
+    live = get_live(catname, exceptions)
     update_cache(cached, live)
 
-    end = u'</noinclude>'
-    m = txt.find(end)
-    if m == -1:
-        raise StandardError("Fant ikke includeonly")
-    m += len(end)
-    txt = txt[:m]
+    tagstart = u'<!--DB-NyeArtiklerStart-->'
+    tagend = u'<!--DB-NyeArtiklerSlutt-->'
+    posstart = txt.find(tagstart)
+    if posstart == -1:
+        raise StandardError("Fant ikke tagstart")
+    posstart += len(tagstart)
+    posend = txt.find(tagend)
+    if posend == -1:
+        raise StandardError("Fant ikke tagend")
 
-    txt += '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
+    ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
     
     cur = sql.cursor()
     cur.execute(u'SELECT article, date_added FROM articles WHERE category=? ORDER BY date_added DESC LIMIT %s' % maxitems, [catname])
@@ -108,17 +115,22 @@ def makelist(catname, txt, maxitems):
     for r in cur.fetchall():
         d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S').strftime('%d.%m')
         if d != cdate:
-            txt += '\n<small>%s</small>: ' % d
+            ntxt += '\n<small>%s</small>: ' % d
             cdate = d
         else:
-            txt += '{{,}} '
-        txt += '[[%s]] ' % r[0].replace('_', ' ')
-    txt += u'<div><small>Listen reflekterer artikler nylig kategorisert, ikke nødvendig nyopprettede artikler. Inntil et visst antall nye artikler er registrert, vil listen vise et «tilfeldig» sett artikler registrert den første dagen boten kjørte.</small></div>'
+            ntxt += '{{,}} '
+        ntxt += '[[%s]] ' % r[0].replace('_', ' ')
+
+    ntxt += '\n'
+    txt = txt[:posstart] + ntxt + txt[posend:]
     return txt
 
 
 template = no.pages[template_name]
 for page in template.embeddedin():
+    print page.page_title
+    #if page.page_title != u'DanmicholoBot/Sandkasse2':
+    #    continue
     txt = page.edit()
     te = TemplateEditor(txt)
     template = te.templates[template_name.lower()][0]
@@ -132,9 +144,13 @@ for page in template.embeddedin():
     if 'antall' in template.parameters:
         antall = template.parameters['antall']
     
+    utelat = []
+    if 'utelat' in template.parameters:
+        utelat = [u.strip().replace(' ','_') for u in template.parameters['utelat'].split(',')]
+    
     cat = no.categories[catname]
     if cat.exists:
-        txt = makelist(catname, txt, maxitems = antall)
+        txt = makelist(catname, txt, maxitems = antall, exceptions = utelat)
         page.save(txt, edit_summary)
 
 
