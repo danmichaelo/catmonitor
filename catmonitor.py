@@ -3,6 +3,7 @@
 
 import mwclient
 import os, oursql, sqlite3, re
+import time
 from progressbar import ProgressBar, Percentage, Bar, ETA, SimpleProgress, Counter
 from datetime import datetime
 from danmicholoparser import TemplateEditor
@@ -31,7 +32,7 @@ smtp_handler = logging.handlers.SMTPHandler( mailhost = ('localhost', 25),
 smtp_handler.setLevel(logging.ERROR)
 logger.addHandler(smtp_handler)
 
-file_handler = logging.FileHandler('catmonitor.log')
+file_handler = logging.handlers.RotatingFileHandler('catmonitor.log', maxBytes=100000, backupCount=3)
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
@@ -40,6 +41,19 @@ logger.addHandler(file_handler)
 #console_handler.setLevel(logging.INFO)
 #console_handler.setFormatter(formatter)
 #logger.addHandler(console_handler)
+
+def get_date_created(article):
+    o = no.api('query', prop='revisions', rvlimit=1, rvdir='newer', titles=article)['query']['pages'].itervalues().next()
+    if not 'revisions' in o:
+        logger.error("Could not find first revision for article %s" % article)
+        return False
+    
+    ts = o['revisions'][0]['timestamp']
+    #page = no.pages[article]
+    #rev = page.revisions(limit=1, dir='newer').next()
+    ts = datetime.strptime(ts, '%Y-%m-%dT%H:%M:%SZ')
+    #ts = datetime.fromtimestamp(time.mktime(ts))
+    return ts
 
 def get_cached(catname):
     cur = sql.cursor()
@@ -102,14 +116,19 @@ def update_cache(cached, live):
         cur.execute(u'DELETE FROM articles WHERE category=? AND article=?', [catname, article])
     
     for article in added:
-        cur.execute(u'INSERT INTO articles (category, article, date_added) VALUES (?,?,?)', [catname, article, now])
+        created = get_date_created(article)
+        if date_created != False:
+            cur.execute(u'INSERT INTO articles (category, article, date_added, date_created) VALUES (?,?,?,?)', [catname, article, now, created])
 
     sql.commit()
     cur.close()
 
-def makelist(catname, txt, maxitems, exceptions):
+def makelist(catname, txt, maxitems, exceptions, header):
+
     if type(catname) != unicode:
         raise StandardError("catname must be unicode object")
+
+    logger.info("Making list for %s", catname)
 
     maxitems = int(maxitems)
     if maxitems <= 0:
@@ -129,19 +148,29 @@ def makelist(catname, txt, maxitems, exceptions):
     if posend == -1:
         raise StandardError("Fant ikke tagend")
 
-    ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
+    ntxt = ''
+    if header != '':
+        ntxt = '\n' + header % { 'category': catname, 'articlecount': len(live) }
+    #ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
     
     cur = sql.cursor()
+    mindate = cur.execute(u'SELECT MIN(date_added) FROM articles WHERE category=?', [catname]).fetchall()[0][0]
+    #mindate = datetime.strptime(mindate, '%Y-%m-%d %H:%M:%S')
+    logger.info("Min date is %s", mindate)
+    
     cur.execute(u'SELECT article, date_added FROM articles WHERE category=? ORDER BY date_added DESC LIMIT %s' % maxitems, [catname])
     cdate = ''
     for r in cur.fetchall():
-        d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S').strftime('%d.%m')
-        if d != cdate:
-            ntxt += '\n<small>%s</small>: ' % d
-            cdate = d
-        else:
-            ntxt += '{{,}} '
-        ntxt += '[[%s]] ' % r[0].replace('_', ' ')
+        if r[1] != mindate:
+            logger.info("article date is %s", r[1])
+            d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
+            d = d.strftime('%d.%m')
+            if d != cdate:
+                ntxt += '\n<small>%s</small>: ' % d
+                cdate = d
+            else:
+                ntxt += '{{,}} '
+            ntxt += '[[%s]] ' % r[0].replace('_', ' ')
 
     ntxt += '\n'
     txt = txt[:posstart] + ntxt + txt[posend:]
@@ -150,6 +179,11 @@ def makelist(catname, txt, maxitems, exceptions):
 def total_seconds(td):
     # for backwards compability. td is a timedelta object
     return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
+
+
+    
+
+
 
 runstart = datetime.now()
 import platform
@@ -176,10 +210,27 @@ for page in template.embeddedin():
     utelat = []
     if 'utelat' in template.parameters:
         utelat = [u.strip().replace(' ','_') for u in template.parameters['utelat'].split(',')]
+
+    overskrift = '<div class="prosjekt-header">[[:Kategori:%(category)s|Kategori:%(category)s]] inneholder %(articlecount)s artikler</div>'
+    if 'overskrift' in template.parameters:
+        overskrift = template.parameters['overskrift']
     
     cat = no.categories[catname]
     if cat.exists:
-        txt = makelist(catname, txt, maxitems = antall, exceptions = utelat)
+
+        cur = sql.cursor()
+        cur.execute(u'SELECT article FROM articles WHERE category=? AND date_created IS NULL', [catname])
+        articles = [r[0] for r in cur.fetchall()]
+        if len(articles) > 0:
+            logger.info("Backfillling creation dates for %d articles (this may take a long while)", len(articles))
+            for article in articles:
+                logger.info(article)
+                created = get_date_created(article)
+                cur.execute(u'UPDATE articles set date_created=? WHERE article=?', [created, article])
+                sql.commit()
+
+
+        txt = makelist(catname, txt, maxitems = antall, exceptions = utelat, header = overskrift)
         page.save(txt, edit_summary)
 
 runend = datetime.now()

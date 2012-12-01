@@ -11,6 +11,7 @@ CREATE TABLE articles (
   category TEXT NOT NULL,
   article TEXT NOT NULL,
   date_added DATE NOT NULL,
+  date_created DATE,
   PRIMARY KEY (category,article)
 );
 ````
