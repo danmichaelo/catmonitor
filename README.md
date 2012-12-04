@@ -10,9 +10,11 @@ To get started, run <code>sqlite3 catmonitor.db</code> and
 CREATE TABLE articles (
   category TEXT NOT NULL,
   article TEXT NOT NULL,
-  date_added DATE NOT NULL,
+  date_added DATE NOT NULL, 
   date_created DATE,
   PRIMARY KEY (category,article)
 );
+CREATE INDEX date_added ON articles(date_added);
+CREATE INDEX date_created ON articles(date_created);
 ````
 

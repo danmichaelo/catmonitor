@@ -28,7 +28,7 @@ formatter = logging.Formatter('[%(asctime)s %(levelname)s] %(message)s')
 
 smtp_handler = logging.handlers.SMTPHandler( mailhost = ('localhost', 25),
                 fromaddr = mailfrom, toaddrs = mailto, 
-                subject=u"[toolserver] CatWatchBot crashed!")
+                subject=u"[toolserver] CatMonitor crashed!")
 smtp_handler.setLevel(logging.ERROR)
 logger.addHandler(smtp_handler)
 
@@ -45,7 +45,7 @@ logger.addHandler(file_handler)
 def get_date_created(article):
     o = no.api('query', prop='revisions', rvlimit=1, rvdir='newer', titles=article)['query']['pages'].itervalues().next()
     if not 'revisions' in o:
-        logger.error("Could not find first revision for article %s" % article)
+        logger.error(u"Could not find first revision for article %s", article)
         return False
     
     ts = o['revisions'][0]['timestamp']
@@ -75,7 +75,7 @@ def get_live(catname, exceptions):
     cats = [catname];
     articles = [];
     for catname in cats:
-        cur.execute('SELECT page.page_title, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id', [catname.encode('utf-8')])
+        cur.execute('SELECT page.page_title, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=14)', [catname.encode('utf-8')])
         for row in cur.fetchall():
             if row[1] == 'subcat':
                 cat = row[0].decode('utf-8')
@@ -117,7 +117,7 @@ def update_cache(cached, live):
     
     for article in added:
         created = get_date_created(article)
-        if date_created != False:
+        if created != False:
             cur.execute(u'INSERT INTO articles (category, article, date_added, date_created) VALUES (?,?,?,?)', [catname, article, now, created])
 
     sql.commit()
@@ -154,23 +154,23 @@ def makelist(catname, txt, maxitems, exceptions, header):
     #ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
     
     cur = sql.cursor()
-    mindate = cur.execute(u'SELECT MIN(date_added) FROM articles WHERE category=?', [catname]).fetchall()[0][0]
+    #mindate = cur.execute(u'SELECT MIN(date_added) FROM articles WHERE category=?', [catname]).fetchall()[0][0]
     #mindate = datetime.strptime(mindate, '%Y-%m-%d %H:%M:%S')
-    logger.info("Min date is %s", mindate)
+    #logger.info("Min date is %s", mindate)
     
-    cur.execute(u'SELECT article, date_added FROM articles WHERE category=? ORDER BY date_added DESC LIMIT %s' % maxitems, [catname])
+    cur.execute(u'SELECT article, date_created FROM articles WHERE category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [catname])
     cdate = ''
     for r in cur.fetchall():
-        if r[1] != mindate:
-            logger.info("article date is %s", r[1])
-            d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
-            d = d.strftime('%d.%m')
-            if d != cdate:
-                ntxt += '\n<small>%s</small>: ' % d
-                cdate = d
-            else:
-                ntxt += '{{,}} '
-            ntxt += '[[%s]] ' % r[0].replace('_', ' ')
+        #if r[1] != mindate:
+        logger.info("article date is %s", r[1])
+        d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
+        d = d.strftime('%d.%m')
+        if d != cdate:
+            ntxt += '\n<small>%s</small>: ' % d
+            cdate = d
+        else:
+            ntxt += '{{,}} '
+        ntxt += '[[%s]] ' % r[0].replace('_', ' ')
 
     ntxt += '\n'
     txt = txt[:posstart] + ntxt + txt[posend:]
@@ -224,11 +224,14 @@ for page in template.embeddedin():
         if len(articles) > 0:
             logger.info("Backfillling creation dates for %d articles (this may take a long while)", len(articles))
             for article in articles:
-                logger.info(article)
-                created = get_date_created(article)
-                cur.execute(u'UPDATE articles set date_created=? WHERE article=?', [created, article])
-                sql.commit()
-
+                #logger.info(article)
+                try:
+                    created = get_date_created(article)
+                    if created:
+                        cur.execute(u'UPDATE articles set date_created=? WHERE article=?', [created, article])
+                        sql.commit()
+                except ValueError:
+                    logger.error(u"Could not fetch date for %s", article)
 
         txt = makelist(catname, txt, maxitems = antall, exceptions = utelat, header = overskrift)
         page.save(txt, edit_summary)
