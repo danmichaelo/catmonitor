@@ -109,6 +109,7 @@ def update_cache(cached, live):
     added = list(live_set.difference(cached_set))
     removed = list(cached_set.difference(live_set))
 
+    logger.info(" -> %d articles in cache, %d articles live", len(cached), len(live))
     logger.info(" -> %d articles added, %d articles removed", len(added), len(removed))
     
     cur = sql.cursor()
@@ -116,27 +117,37 @@ def update_cache(cached, live):
         cur.execute(u'DELETE FROM articles WHERE category=? AND article=?', [catname, article])
     
     for article in added:
-        created = get_date_created(article)
-        if created != False:
-            cur.execute(u'INSERT INTO articles (category, article, date_added, date_created) VALUES (?,?,?,?)', [catname, article, now, created])
+        #created = get_date_created(article)
+        #if created != False:
+        cur.execute(u'INSERT INTO articles (category, article, date_added) VALUES (?,?,?)', [catname, article, now])
 
     sql.commit()
     cur.close()
 
-def makelist(catname, txt, maxitems, exceptions, header):
+def update(catname, exceptions):
 
     if type(catname) != unicode:
         raise StandardError("catname must be unicode object")
-
+    
     logger.info("Making list for %s", catname)
-
-    maxitems = int(maxitems)
-    if maxitems <= 0:
-        raise StandardError("maxitems: invalid value")
     
     cached = get_cached(catname)
     live = get_live(catname, exceptions)
     update_cache(cached, live)
+
+    #ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
+    
+    #mindate = cur.execute(u'SELECT MIN(date_added) FROM articles WHERE category=?', [catname]).fetchall()[0][0]
+    #mindate = datetime.strptime(mindate, '%Y-%m-%d %H:%M:%S')
+    #logger.info("Min date is %s", mindate)
+
+    return len(live)
+
+def makelist(catname, txt, maxitems, header, articlecount):
+    
+    maxitems = int(maxitems)
+    if maxitems <= 0:
+        raise StandardError("maxitems: invalid value")
 
     tagstart = u'<!--DB-NyeArtiklerStart-->'
     tagend = u'<!--DB-NyeArtiklerSlutt-->'
@@ -150,19 +161,13 @@ def makelist(catname, txt, maxitems, exceptions, header):
 
     ntxt = ''
     if header != '':
-        ntxt = '\n' + header % { 'category': catname, 'articlecount': len(live) }
-    #ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
-    
+        ntxt = '\n' + header % { 'category': catname, 'articlecount': articlecount }
     cur = sql.cursor()
-    #mindate = cur.execute(u'SELECT MIN(date_added) FROM articles WHERE category=?', [catname]).fetchall()[0][0]
-    #mindate = datetime.strptime(mindate, '%Y-%m-%d %H:%M:%S')
-    #logger.info("Min date is %s", mindate)
-    
     cur.execute(u'SELECT article, date_created FROM articles WHERE category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [catname])
     cdate = ''
     for r in cur.fetchall():
         #if r[1] != mindate:
-        logger.info("article date is %s", r[1])
+        #logger.info("article date is %s", r[1])
         d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
         d = d.strftime('%d.%m')
         if d != cdate:
@@ -171,6 +176,7 @@ def makelist(catname, txt, maxitems, exceptions, header):
         else:
             ntxt += '{{,}} '
         ntxt += '[[%s]] ' % r[0].replace('_', ' ')
+    cur.close()
 
     ntxt += '\n'
     txt = txt[:posstart] + ntxt + txt[posend:]
@@ -180,8 +186,6 @@ def total_seconds(td):
     # for backwards compability. td is a timedelta object
     return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
 
-
-    
 
 
 
@@ -218,6 +222,10 @@ for page in template.embeddedin():
     cat = no.categories[catname]
     if cat.exists:
 
+        catname = catname.replace(' ', '_')
+
+        articlecount = update(catname, exceptions = utelat)
+
         cur = sql.cursor()
         cur.execute(u'SELECT article FROM articles WHERE category=? AND date_created IS NULL', [catname])
         articles = [r[0] for r in cur.fetchall()]
@@ -232,8 +240,8 @@ for page in template.embeddedin():
                         sql.commit()
                 except ValueError:
                     logger.error(u"Could not fetch date for %s", article)
-
-        txt = makelist(catname, txt, maxitems = antall, exceptions = utelat, header = overskrift)
+        cur.close()
+        txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount)
         page.save(txt, edit_summary)
 
 runend = datetime.now()
