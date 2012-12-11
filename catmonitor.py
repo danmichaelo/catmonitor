@@ -166,11 +166,11 @@ def makelist(catname, txt, maxitems, exceptions, header):
         d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
         d = d.strftime('%d.%m')
         if d != cdate:
-            ntxt += '\n<small>%s</small>: ' % d
+            ntxt += '\n* <small>%s</small>: ' % d
             cdate = d
         else:
             ntxt += '{{,}} '
-        ntxt += '[[%s]] ' % r[0].replace('_', ' ')
+        ntxt += '[[%s]]' % r[0].replace('_', ' ')
 
     ntxt += '\n'
     txt = txt[:posstart] + ntxt + txt[posend:]
