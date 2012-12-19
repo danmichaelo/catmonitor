@@ -175,7 +175,7 @@ def makelist(catname, txt, maxitems, header, articlecount):
             cdate = d
         else:
             ntxt += '{{,}} '
-        ntxt += '[[%s]] ' % r[0].replace('_', ' ')
+        ntxt += '[[%s]]' % r[0].replace('_', ' ')
     cur.close()
 
     ntxt += '\n'
