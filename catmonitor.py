@@ -10,6 +10,7 @@ from danmicholoparser import TemplateEditor
 from wp_private import botlogin, mailfrom, mailto
 import logging
 import logging.handlers
+import argparse
 
 template_name = u'Bruker:DanmicholoBot/Kategoriovervåkning'
 edit_summary = 'Oppdaterer liste over nye artikler'
@@ -21,6 +22,12 @@ maxcats = 10000
 sql = sqlite3.connect('catmonitor.db')
 no = mwclient.Site(host)
 no.login(*botlogin)
+
+parser = argparse.ArgumentParser( description = 'CatMonitor' )
+#parser.add_argument('--page', required=False, help='Name of the contest page to work with')
+parser.add_argument('--silent', action='store_true', help='No output to console')
+parser.add_argument('--verbose', action='store_true', help='Output debug messages')
+args = parser.parse_args()
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -37,10 +44,14 @@ file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-#console_handler = logging.StreamHandler()
-#console_handler.setLevel(logging.INFO)
-#console_handler.setFormatter(formatter)
-#logger.addHandler(console_handler)
+if not args.silent:
+    console_handler = logging.StreamHandler()
+    if args.verbose:
+        console_handler.setLevel(logging.DEBUG)
+    else:
+        console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 def get_date_created(article):
     o = no.api('query', prop='revisions', rvlimit=1, rvdir='newer', titles=article)['query']['pages'].itervalues().next()
@@ -143,7 +154,7 @@ def update(catname, exceptions):
 
     return len(live)
 
-def makelist(catname, txt, maxitems, header, articlecount):
+def makelist(catname, txt, maxitems, header, articlecount, date_tpl, separator):
     
     maxitems = int(maxitems)
     if maxitems <= 0:
@@ -164,18 +175,23 @@ def makelist(catname, txt, maxitems, header, articlecount):
         ntxt = '\n' + header % { 'category': catname, 'articlecount': articlecount }
     cur = sql.cursor()
     cur.execute(u'SELECT article, date_created FROM articles WHERE category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [catname])
-    cdate = ''
+    #cdate = ''
+    buf = { 'dato': '', 'artikler': '' }
     for r in cur.fetchall():
         #if r[1] != mindate:
         #logger.info("article date is %s", r[1])
         d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
         d = d.strftime('%d.%m')
-        if d != cdate:
-            ntxt += '\n<small>%s</small>: ' % d
-            cdate = d
+        if d != buf['dato']:
+            if buf['artikler'] != '':
+                ntxt += '\n' + date_tpl % buf 
+            buf['dato'] = d
+            buf['artikler'] = ''
         else:
-            ntxt += '{{,}} '
-        ntxt += '[[%s]]' % r[0].replace('_', ' ')
+            buf['artikler'] += separator
+        buf['artikler'] += '[[%s]]' % r[0].replace('_', ' ')
+    if buf['artikler'] != '':
+        ntxt += '\n' + date_tpl % buf 
     cur.close()
 
     ntxt += '\n'
@@ -219,6 +235,14 @@ for page in template.embeddedin():
     if 'overskrift' in template.parameters:
         overskrift = template.parameters['overskrift']
     
+    dato_mal = '<small>%(dato)s</small>: %(artikler)s'
+    if 'dato_mal' in template.parameters:
+        dato_mal = template.parameters['dato_mal']
+
+    sep = '{{,}} '
+    if 'skille_mal' in template.parameters:
+        sep = template.parameters['skille_mal']
+    
     cat = no.categories[catname]
     if cat.exists:
 
@@ -241,7 +265,7 @@ for page in template.embeddedin():
                 except ValueError:
                     logger.error(u"Could not fetch date for %s", article)
         cur.close()
-        txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount)
+        txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount, date_tpl=dato_mal, separator=sep)
         page.save(txt, edit_summary)
 
 runend = datetime.now()
