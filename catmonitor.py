@@ -6,28 +6,25 @@ import os, oursql, sqlite3, re
 import time
 from progressbar import ProgressBar, Percentage, Bar, ETA, SimpleProgress, Counter
 from datetime import datetime
-from danmicholoparser import TemplateEditor
+from mwtemplates import TemplateEditor
 from wp_private import botlogin, mailfrom, mailto
 import logging
 import logging.handlers
 import argparse
-
-template_name = u'Bruker:DanmicholoBot/Kategoriovervåkning'
-edit_summary = 'Oppdaterer liste over nye artikler'
-host = 'no.wikipedia.org'
-mysql_host = 'nowiki-p.rrdb.toolserver.org'
-mysql_db = 'nowiki_p'
-maxcats = 10000
-
-sql = sqlite3.connect('catmonitor.db')
-no = mwclient.Site(host)
-no.login(*botlogin)
+import yaml
 
 parser = argparse.ArgumentParser( description = 'CatMonitor' )
-#parser.add_argument('--page', required=False, help='Name of the contest page to work with')
 parser.add_argument('--silent', action='store_true', help='No output to console')
 parser.add_argument('--verbose', action='store_true', help='Output debug messages')
+parser.add_argument('--config', nargs='?', default='config.yml', help='Config file')
 args = parser.parse_args()
+
+config = yaml.load(open(args.config, 'r'))
+
+sql = sqlite3.connect(config.local_db)
+no = mwclient.Site(config.host)
+no.login(*botlogin)
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -76,28 +73,28 @@ def get_cached(catname):
 
 def get_live(catname, exceptions):
     # The text in the DB is UTF-8, but identified as latin1, so we need to be careful
-    db = oursql.connect(host=mysql_host, db=mysql_db, charset=None, use_unicode=False,
+    db = oursql.connect(host=config.mysql_host, db=config.mysql_db, charset=None, use_unicode=False,
             read_default_file=os.path.expanduser('~/.my.cnf'))   
     cur = db.cursor()
 
-    #pbar = ProgressBar(maxval=maxcats, widgets=['Categories: ', Counter()])
+    #pbar = ProgressBar(maxval=config.maxcats, widgets=['Categories: ', Counter()])
     #pbar.start()
 
     cats = [catname];
     articles = [];
     for catname in cats:
-        cur.execute('SELECT page.page_title, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=14)', [catname.encode('utf-8')])
+        cur.execute('SELECT page.page_title, page.page_namespace, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=1 OR page.page_namespace=14)', [catname.encode('utf-8')])
         for row in cur.fetchall():
-            if row[1] == 'subcat':
+            if row[2] == 'subcat':
                 cat = row[0].decode('utf-8')
                 if cat not in exceptions and cat not in cats:
                     cats.append(cat)
                     #print cat
-            elif row[1] == 'page':
+            elif row[2] == 'page':
                 pg = row[0].decode('utf-8')
                 #if pg not in articles: expensive!
                 articles.append(pg)
-        if len(cats) > maxcats:
+        if len(cats) > config.maxcats:
             raise StandardError("Too many categories. We should probably add exclusions")
         #    pbar.maxval = len(cats)
         #pbar.update(len(cats))
@@ -209,39 +206,39 @@ runstart = datetime.now()
 import platform
 pv = platform.python_version()
 logger.info('running Python %s' % (pv))
-template = no.pages[template_name]
+template = no.pages[config.template_name]
 for page in template.embeddedin():
     logger.info("Checking: %s", page.page_title)
     #if page.page_title != u'DanmicholoBot/Sandkasse2':
     #    continue
     txt = page.edit()
     te = TemplateEditor(txt)
-    template = te.templates[template_name.lower()][0]
+    template = te.templates[config.template_name][0]
     
     if 'kategori' in template.parameters:
-        catname = template.parameters['kategori']
+        catname = template.parameters['kategori'].value
     else:
-        catname = template.parameters[1]
+        catname = template.parameters[1].value
     
     antall = 10
     if 'antall' in template.parameters:
-        antall = template.parameters['antall']
+        antall = template.parameters['antall'].value
     
     utelat = []
     if 'utelat' in template.parameters:
-        utelat = [u.strip().replace(' ','_') for u in template.parameters['utelat'].split(',')]
+        utelat = [u.strip().replace(' ','_') for u in template.parameters['utelat'].value.split(',')]
 
     overskrift = '<div class="prosjekt-header">[[:Kategori:%(category)s|Kategori:%(category)s]] inneholder %(articlecount)s artikler</div>'
     if 'overskrift' in template.parameters:
-        overskrift = template.parameters['overskrift']
+        overskrift = template.parameters['overskrift'].value
     
     dato_mal = '<small>%(dato)s</small>: %(artikler)s'
     if 'dato_mal' in template.parameters:
-        dato_mal = template.parameters['dato_mal']
+        dato_mal = template.parameters['dato_mal'].value
 
     sep = '{{,}} '
     if 'skille_mal' in template.parameters:
-        sep = template.parameters['skille_mal']
+        sep = template.parameters['skille_mal'].value
     
     cat = no.categories[catname]
     if cat.exists:
@@ -266,7 +263,7 @@ for page in template.embeddedin():
                     logger.error(u"Could not fetch date for %s", article)
         cur.close()
         txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount, date_tpl=dato_mal, separator=sep)
-        page.save(txt, edit_summary)
+        page.save(txt, config.edit_summary)
 
 runend = datetime.now()
 runtime = total_seconds(runend - runstart)
