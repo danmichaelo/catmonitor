@@ -4,10 +4,9 @@
 import mwclient
 import os, oursql, sqlite3, re
 import time
-from progressbar import ProgressBar, Percentage, Bar, ETA, SimpleProgress, Counter
+#from progressbar import ProgressBar, Percentage, Bar, ETA, SimpleProgress, Counter
 from datetime import datetime
 from mwtemplates import TemplateEditor
-from wp_private import botlogin, mailfrom, mailto
 import logging
 import logging.handlers
 import argparse
@@ -23,7 +22,7 @@ config = yaml.load(open(args.config, 'r'))
 
 sql = sqlite3.connect(config['local_db'])
 no = mwclient.Site(config['host'])
-no.login(*botlogin)
+no.login(config['user'], config['pwd'])
 
 
 logger = logging.getLogger()
@@ -31,8 +30,8 @@ logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('[%(asctime)s %(levelname)s] %(message)s')
 
 smtp_handler = logging.handlers.SMTPHandler( mailhost = ('localhost', 25),
-                fromaddr = mailfrom, toaddrs = mailto, 
-                subject=u"[toolserver] CatMonitor crashed!")
+                fromaddr = config['mailfrom'], toaddrs = config['mailto'], 
+                subject=u"[tool labs] CatMonitor crashed!")
 smtp_handler.setLevel(logging.ERROR)
 logger.addHandler(smtp_handler)
 

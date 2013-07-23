@@ -5,4 +5,7 @@ mysql_host: 'nowiki-p.rrdb.toolserver.org'
 mysql_db: 'nowiki_p'
 maxcats: 10000 
 local_db: 'catmonitor.no.db'
-
+user: 'USERNAME'
+pwd: 'PASSWORD'
+mailfrom: 'EMAIL'
+mailto: ['EMAIL']
