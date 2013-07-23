@@ -1,0 +1,30 @@
+{# -*- coding: utf-8; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:et:sw=4:ts=4:sts=4 #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>CatMonitor status</title>
+    <link rel="stylesheet" href="main.css" />
+    <!--<script src="js/jquery.combined.js"></script>-->
+    {% block header %}{% endblock %}
+</head>
+<body>
+    <div id="navbar">
+        <img src="/matvaretabellen/images/Wikimedia_Labs_logo_notext.svg.png" style="float:right;" />
+        <h1>Catmonitor status</h1>
+    </div>
+    <p style="background:#ffaaaa; padding:10px;margin:10px;">
+    <em>Verktøyet er under utvikling, og ikke helt funksjonibelt enda. </em>
+    </p>
+    {% block body %}{% endblock %}
+
+<div id="footer">
+	{%block footer %}
+    Dette verktøyet er skrevet av <a href="//no.wikipedia.org/wiki/Bruker:Danmichaelo">Danmichaelo</a>. 
+    <a href="https://github.com/danmichaelo/catmonitor">Vis kildekode</a> 
+    (tilgjengelig under <a href="http://opensource.org/licenses/MIT">the MIT license</a>).
+    {% endblock %}
+</div>
+
+</body>
+</html>
