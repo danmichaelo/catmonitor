@@ -28,6 +28,6 @@ virtualenv env
 . env/bin/activate
 pip install git+git://github.com/btongminh/mwclient.git
 pip install git+git://github.com/danmichaelo/mwtemplates.git
-pip install oursql pyyaml
+pip install oursql pyyaml werkzeug Jinja2
 </pre>
 Finally do <code>cp config.dist.yml config.yml</code> and edit to your preference.
