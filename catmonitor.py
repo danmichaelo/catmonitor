@@ -73,7 +73,7 @@ def get_cached(catname):
 def get_live(catname, exceptions):
     # The text in the DB is UTF-8, but identified as latin1, so we need to be careful
     db = oursql.connect(host=config['mysql_host'], db=config['mysql_db'], charset=None, use_unicode=False,
-            read_default_file=os.path.expanduser('~/.my.cnf'))   
+            read_default_file=os.path.expanduser('~/.replica.my.cnf'))   
     cur = db.cursor()
 
     #pbar = ProgressBar(maxval=config['maxcats'], widgets=['Categories: ', Counter()])
