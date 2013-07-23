@@ -21,8 +21,8 @@ args = parser.parse_args()
 
 config = yaml.load(open(args.config, 'r'))
 
-sql = sqlite3.connect(config.local_db)
-no = mwclient.Site(config.host)
+sql = sqlite3.connect(config['local_db'])
+no = mwclient.Site(config['host'])
 no.login(*botlogin)
 
 
@@ -73,11 +73,11 @@ def get_cached(catname):
 
 def get_live(catname, exceptions):
     # The text in the DB is UTF-8, but identified as latin1, so we need to be careful
-    db = oursql.connect(host=config.mysql_host, db=config.mysql_db, charset=None, use_unicode=False,
+    db = oursql.connect(host=config['mysql_host'], db=config['mysql_db'], charset=None, use_unicode=False,
             read_default_file=os.path.expanduser('~/.my.cnf'))   
     cur = db.cursor()
 
-    #pbar = ProgressBar(maxval=config.maxcats, widgets=['Categories: ', Counter()])
+    #pbar = ProgressBar(maxval=config['maxcats'], widgets=['Categories: ', Counter()])
     #pbar.start()
 
     cats = [catname];
@@ -94,7 +94,7 @@ def get_live(catname, exceptions):
                 pg = row[0].decode('utf-8')
                 #if pg not in articles: expensive!
                 articles.append(pg)
-        if len(cats) > config.maxcats:
+        if len(cats) > config['maxcats']:
             raise StandardError("Too many categories. We should probably add exclusions")
         #    pbar.maxval = len(cats)
         #pbar.update(len(cats))
@@ -206,14 +206,14 @@ runstart = datetime.now()
 import platform
 pv = platform.python_version()
 logger.info('running Python %s' % (pv))
-template = no.pages[config.template_name]
+template = no.pages[config['template']]
 for page in template.embeddedin():
     logger.info("Checking: %s", page.page_title)
     #if page.page_title != u'DanmicholoBot/Sandkasse2':
     #    continue
     txt = page.edit()
     te = TemplateEditor(txt)
-    template = te.templates[config.template_name][0]
+    template = te.templates[config['template']][0]
     
     if 'kategori' in template.parameters:
         catname = template.parameters['kategori'].value
@@ -263,7 +263,7 @@ for page in template.embeddedin():
                     logger.error(u"Could not fetch date for %s", article)
         cur.close()
         txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount, date_tpl=dato_mal, separator=sep)
-        page.save(txt, config.edit_summary)
+        page.save(txt, config['edit_summary'])
 
 runend = datetime.now()
 runtime = total_seconds(runend - runstart)
