@@ -1,0 +1,7 @@
+cython
+flup
+flask
+pyyaml
+mwtemplates
+oursql
+

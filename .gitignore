@@ -1,5 +1,6 @@
 *.db
-*.log
+*.log*
 *.pyc
 *.swp
 wp_private.py
+ENV
