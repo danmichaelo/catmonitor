@@ -3,5 +3,6 @@ flup
 flask
 pyyaml
 mwtemplates
+mwclient
 oursql
 
