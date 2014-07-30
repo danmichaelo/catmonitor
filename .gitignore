@@ -4,3 +4,4 @@
 *.swp
 wp_private.py
 ENV
+public_html/bower_components

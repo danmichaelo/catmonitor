@@ -1,0 +1,17 @@
+{
+  "name": "catmonitor",
+  "version": "0.1.0",
+  "homepage": "https://github.com/danmichaelo/catmonitor",
+  "authors": [
+    "Dan Michael O. Heggø <danmichaelo@gmail.com>"
+  ],
+  "description": "Tool for monitoring member changes to modestly sized category trees at Wikipedia",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "public_html/bower_components"
+  ],
+  "dependencies": {
+    "angular-charts": "~0.2.4"
+  }
+}

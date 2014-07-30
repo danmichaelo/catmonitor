@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="app">
+<head>
+    <meta charset="utf-8" />
+    <title>CatMonitor status</title>
+    <link rel="stylesheet" href="main.css" />
+    <!--<script src="js/jquery.combined.js"></script>-->
+    <script type='text/javascript' src='./bower_components/angular/angular.min.js'></script> 
+    <script type='text/javascript' src='./bower_components/d3/d3.min.js'></script> 
+    <script type='text/javascript' src='./bower_components/angular-charts/dist/angular-charts.min.js'></script>
+    <script type='text/javascript' src='./src/app.js'></script> 
+</head>
+<body>
+
+    <div id="navbar">
+        <img src="/matvaretabellen/images/Wikimedia_Labs_logo_notext.svg.png" style="float:right;" />
+        <h1>Catmonitor status</h1>
+    </div>
+
+    <div ng-controller="AppCtrl">
+        <h2 ng-repeat-start="project in projects">{{ project.host }}</h2>
+        <p>
+            Template: <a href="//{{ project.host }}/wiki/{{ project.template }}">{{ project.template }}</a>
+        </p>
+        <p>
+          Kategorier som overvåkes:
+        </p>
+        <ul ng-repeat-end>
+          <li ng-repeat="category in project.categories">
+            <a href="//{{ project.host }}/wiki/Category:{{ category.name }}">{{ category.name }}</a>
+            ({{ category.membercount[0].value }} artikler, {{ category.membercount[0].timestamp }})
+          </li>
+        </ul>
+    </div>
+
+    <div id="footer">
+        Dette verktøyet er skrevet av <a href="//no.wikipedia.org/wiki/Bruker:Danmichaelo">Danmichaelo</a>. 
+        <a href="https://github.com/danmichaelo/catmonitor">Vis kildekode</a> 
+        (tilgjengelig under <a href="http://opensource.org/licenses/MIT">the MIT license</a>).
+    </div>
+
+</body>
+</html>
