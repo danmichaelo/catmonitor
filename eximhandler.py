@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 
+
 class EximHandler(logging.Handler):
     """
     A handler class which sends an SMTP email for each logging event.
@@ -34,7 +35,7 @@ class EximHandler(logging.Handler):
             msg = self.format(record)
 
             p1 = Popen(["echo", "-e", "Subject: " + self.subject + "\n\n" + msg], stdout=PIPE)
-            p2 = Popen(["/usr/sbin/exim", "-odf", "-i", "danmichaelo@gmail.com"], stdin=p1.stdout, stdout=PIPE)
+            p2 = Popen(["/usr/sbin/exim", "-odf", "-i", self.toaddr], stdin=p1.stdout, stdout=PIPE)
             p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
             output = p2.communicate()[0]
 
@@ -42,4 +43,3 @@ class EximHandler(logging.Handler):
             raise
         except:
             self.handleError(record)
- 
