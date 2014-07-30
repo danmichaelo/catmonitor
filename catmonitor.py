@@ -136,6 +136,17 @@ def update_cache(cached, live):
     sql.commit()
     cur.close()
 
+def update_stats(catname):
+    now = datetime.now().strftime('%F %T')
+    
+    cur = sql.cursor()
+    cur.execute(u'SELECT COUNT(*) FROM articles WHERE category=?', [catname])
+    membercount = cur.fetchall()[0][0]
+    
+    cur.execute(u'INSERT INTO stats (category, ts, membercount) VALUES (?,?,?)', [catname, now, membercount])
+    sql.commit()
+    cur.close()
+
 def update(catname, exceptions):
 
     if type(catname) != unicode:
@@ -146,6 +157,7 @@ def update(catname, exceptions):
     cached = get_cached(catname)
     live = get_live(catname, exceptions)
     update_cache(cached, live)
+    update_stats(catname)
 
     #ntxt = '\n<div class="prosjekt-header">[[:Kategori:%s|Kategori:%s]] inneholder %d artikler</div>' % (catname, catname, len(live))
     
@@ -275,5 +287,5 @@ try:
     logger.info('Complete, runtime was %.f seconds.' % (runtime))
 
 except Exception, e:
-    logging.exception(e)
+    logger.exception(e)
 

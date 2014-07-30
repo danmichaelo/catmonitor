@@ -18,6 +18,15 @@ CREATE TABLE articles (
 );
 CREATE INDEX date_added ON articles(date_added);
 CREATE INDEX date_created ON articles(date_created);
+
+CREATE TABLE stats (
+  id INTEGER PRIMARY KEY,
+  category TEXT NOT NULL,
+  ts DATE NOT NULL,
+  membercount INTEGER
+);
+CREATE INDEX category ON stats(category);
+CREATE INDEX ts ON stats(ts);
 ````
 
 Setup a virtualenv and install deps: 
@@ -26,4 +35,4 @@ virtualenv ENV
 . ENV/bin/activate
 pip install -r requirements.txt
 </pre>
-Finally do <code>cp config.dist.yml config.yml</code> and edit to your preference.
+Finally do <code>cp config.dist.json config.json</code> and edit to your preference.
