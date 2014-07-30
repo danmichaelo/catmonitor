@@ -1,0 +1,16 @@
+{
+    "host": "no.wikipedia.org" ,
+    "user": "USER",
+    "pwd": "PASS",
+    "template": "Bruker:DanmicholoBot/Kategoriovervåkning",
+    "edit_summary": "Oppdaterer liste over nye artikler",
+    "maxcats": 10000 ,
+    "local_db": "catmonitor.no.db",
+    "mysql": {
+        "host": "nowiki.labsdb",
+        "db": "nowiki_p"
+    },
+    "mail": {
+        "to": "EMAIL"
+    }
+}

@@ -10,15 +10,17 @@ from mwtemplates import TemplateEditor
 import logging
 import logging.handlers
 import argparse
-import yaml
+import simplejson as json
+
+from eximhandler import EximHandler
 
 parser = argparse.ArgumentParser( description = 'CatMonitor' )
 parser.add_argument('--silent', action='store_true', help='No output to console')
 parser.add_argument('--verbose', action='store_true', help='Output debug messages')
-parser.add_argument('--config', nargs='?', default='config.yml', help='Config file')
+parser.add_argument('--config', nargs='?', default='config.json', help='Config file')
 args = parser.parse_args()
 
-config = yaml.load(open(args.config, 'r'))
+config = json.load(open(args.config, 'r'))
 
 sql = sqlite3.connect(config['local_db'])
 no = mwclient.Site(config['host'])
@@ -29,11 +31,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('[%(asctime)s %(levelname)s] %(message)s')
 
-smtp_handler = logging.handlers.SMTPHandler( mailhost = ('localhost', 25),
-                fromaddr = config['mailfrom'], toaddrs = config['mailto'], 
-                subject=u"[tool labs] CatMonitor crashed!")
-smtp_handler.setLevel(logging.ERROR)
-logger.addHandler(smtp_handler)
+exim_handler = EximHandler(config['mail']['to'], u"[tool labs] CatMonitor crashed!")
+exim_handler.setLevel(logging.ERROR)
+logger.addHandler(exim_handler)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 file_handler = logging.handlers.RotatingFileHandler('catmonitor.log', maxBytes=100000, backupCount=3)
 file_handler.setLevel(logging.INFO)
@@ -72,7 +77,7 @@ def get_cached(catname):
 
 def get_live(catname, exceptions):
     # The text in the DB is UTF-8, but identified as latin1, so we need to be careful
-    db = oursql.connect(host=config['mysql_host'], db=config['mysql_db'], charset=None, use_unicode=False,
+    db = oursql.connect(host=config['mysql']['host'], db=config['mysql']['db'], charset=None, use_unicode=False,
             read_default_file=os.path.expanduser('~/replica.my.cnf'))   
     cur = db.cursor()
 
@@ -200,70 +205,75 @@ def total_seconds(td):
 
 
 
-
 runstart = datetime.now()
 import platform
 pv = platform.python_version()
 logger.info('running Python %s' % (pv))
 template = no.pages[config['template']]
-for page in template.embeddedin():
-    logger.info("Checking: %s", page.page_title)
-    #if page.page_title != u'DanmicholoBot/Sandkasse2':
-    #    continue
-    txt = page.edit()
-    te = TemplateEditor(txt)
-    template = te.templates[config['template']][0]
-    
-    if 'kategori' in template.parameters:
-        catname = template.parameters['kategori'].value
-    else:
-        catname = template.parameters[1].value
-    
-    antall = 10
-    if 'antall' in template.parameters:
-        antall = template.parameters['antall'].value
-    
-    utelat = []
-    if 'utelat' in template.parameters:
-        utelat = [u.strip().replace(' ','_') for u in template.parameters['utelat'].value.split(',')]
+try:
 
-    overskrift = '<div class="prosjekt-header">[[:Kategori:%(category)s|Kategori:%(category)s]] inneholder %(articlecount)s artikler</div>'
-    if 'overskrift' in template.parameters:
-        overskrift = template.parameters['overskrift'].value
-    
-    dato_mal = '<small>%(dato)s</small>: %(artikler)s'
-    if 'dato_mal' in template.parameters:
-        dato_mal = template.parameters['dato_mal'].value
+    for page in template.embeddedin():
+        logger.info("Checking: %s", page.page_title)
+        #if page.page_title != u'DanmicholoBot/Sandkasse2':
+        #    continue
+        txt = page.edit()
+        te = TemplateEditor(txt)
+        template = te.templates[config['template']][0]
+        
+        if 'kategori' in template.parameters:
+            catname = template.parameters['kategori'].value
+        else:
+            catname = template.parameters[1].value
+        
+        antall = 10
+        if 'antall' in template.parameters:
+            antall = template.parameters['antall'].value
+        
+        utelat = []
+        if 'utelat' in template.parameters:
+            utelat = [u.strip().replace(' ','_') for u in template.parameters['utelat'].value.split(',')]
 
-    sep = '{{,}} '
-    if 'skille_mal' in template.parameters:
-        sep = template.parameters['skille_mal'].value
-    
-    cat = no.categories[catname]
-    if cat.exists:
+        overskrift = '<div class="prosjekt-header">[[:Kategori:%(category)s|Kategori:%(category)s]] inneholder %(articlecount)s artikler</div>'
+        if 'overskrift' in template.parameters:
+            overskrift = template.parameters['overskrift'].value
+        
+        dato_mal = '<small>%(dato)s</small>: %(artikler)s'
+        if 'dato_mal' in template.parameters:
+            dato_mal = template.parameters['dato_mal'].value
 
-        catname = catname.replace(' ', '_')
+        sep = '{{,}} '
+        if 'skille_mal' in template.parameters:
+            sep = template.parameters['skille_mal'].value
+        
+        cat = no.categories[catname]
+        if cat.exists:
 
-        articlecount = update(catname, exceptions = utelat)
+            catname = catname.replace(' ', '_')
 
-        cur = sql.cursor()
-        cur.execute(u'SELECT article FROM articles WHERE category=? AND date_created IS NULL', [catname])
-        articles = [r[0] for r in cur.fetchall()]
-        if len(articles) > 0:
-            logger.info("Backfillling creation dates for %d articles (this may take a long while)", len(articles))
-            for article in articles:
-                #logger.info(article)
-                try:
-                    created = get_date_created(article)
-                    if created:
-                        cur.execute(u'UPDATE articles set date_created=? WHERE article=?', [created, article])
-                        sql.commit()
-                except ValueError:
-                    logger.error(u"Could not fetch date for %s", article)
-        cur.close()
-        txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount, date_tpl=dato_mal, separator=sep)
-        page.save(txt, config['edit_summary'])
+            articlecount = update(catname, exceptions = utelat)
 
-runend = datetime.now()
-runtime = total_seconds(runend - runstart)
-logger.info('Complete, runtime was %.f seconds.' % (runtime))
+            cur = sql.cursor()
+            cur.execute(u'SELECT article FROM articles WHERE category=? AND date_created IS NULL', [catname])
+            articles = [r[0] for r in cur.fetchall()]
+            if len(articles) > 0:
+                logger.info("Backfillling creation dates for %d articles (this may take a long while)", len(articles))
+                for article in articles:
+                    #logger.info(article)
+                    try:
+                        created = get_date_created(article)
+                        if created:
+                            cur.execute(u'UPDATE articles set date_created=? WHERE article=?', [created, article])
+                            sql.commit()
+                    except ValueError:
+                        logger.error(u"Could not fetch date for %s", article)
+            cur.close()
+            txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount, date_tpl=dato_mal, separator=sep)
+            page.save(txt, config['edit_summary'])
+
+    runend = datetime.now()
+    runtime = total_seconds(runend - runstart)
+    logger.info('Complete, runtime was %.f seconds.' % (runtime))
+
+except Exception, e:
+    logging.exception(e)
+

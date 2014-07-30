@@ -2,5 +2,5 @@
 
 cd /data/project/catmonitor
 . ENV/bin/activate
-python catmonitor.py --silent --config config.no.yml
+python catmonitor.py --silent --config config.no.json
 
