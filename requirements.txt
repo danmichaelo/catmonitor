@@ -1,8 +1,8 @@
 cython
 flup
 flask
-pyyaml
 mwtemplates
 mwclient
 oursql
+git+git://github.com/danmichaelo/eximhandler.git
 
