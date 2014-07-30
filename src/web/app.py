@@ -7,16 +7,15 @@ import re
 import sqlite3
 
 import simplejson as json
-from flask import Flask
-from flask import render_template
+import flask
 
-app = Flask(__name__)
+app = flask.Flask(__name__)
 
 HOME = '/data/project/catmonitor/'
 
 def error_404():
     return '404'
-    response = render_template('404.html')
+    response = flask.render_template('404.html')
     response.status_code = 404
     return response
 
@@ -40,7 +39,38 @@ def show_index():
         projects.append(p)
         cur.close()
 
-    return render_template('main.html', projects=projects)
+    return flask.render_template('main.html', projects=projects)
+
+
+@app.route('/api')
+def show_api():
+
+    configs = ['config.no.json', 'config.nn.json']
+    projects = []
+
+    for configfile in configs:
+        config = json.load(open(HOME + configfile, 'r'))
+        sql = sqlite3.connect(HOME + config['local_db'])
+        cur = sql.cursor()
+        cur2 = sql.cursor()
+        cur.execute(u'SELECT category, COUNT(article) FROM articles GROUP BY category')
+        cats = []
+        for cat in cur.fetchall():
+            cur2.execute(u'SELECT membercount, ts FROM stats WHERE category=? ORDER BY ts DESC LIMIT 20', [cat[0]])
+            stats = []
+            for s in cur2.fetchall():
+                stats.append({'value': s[0], 'timestamp': s[1]})
+            cats.append({'name': cat[0], 'membercount': stats})
+        p = {
+            'host': config['host'],
+            'template': config['template'],
+            'categories': cats
+        }
+        projects.append(p)
+        cur.close()
+        cur2.close()
+
+    return flask.jsonify(projects=projects)
 
 
 if __name__ == "__main__":
