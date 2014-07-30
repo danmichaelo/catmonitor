@@ -7,6 +7,11 @@ and cached in a local SQLite3 file.
 
 ## Installation:
 
+Install [Bower](//github.com/bower/bower) components:
+```
+bower install
+```
+
 Run <code>sqlite3 catmonitor.db</code> and 
 ````
 CREATE TABLE articles (
