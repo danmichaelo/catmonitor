@@ -6,7 +6,7 @@ from time import time
 import re
 import sqlite3
 
-import yaml
+import simplejson as json
 from flask import Flask
 from flask import render_template
 
@@ -24,11 +24,11 @@ def error_404():
 @app.route('/')
 def show_index():
 
-    configs = ['config.no.yml', 'config.nn.yml']
+    configs = ['config.no.json', 'config.nn.json']
     projects = []
 
     for configfile in configs:
-        config = yaml.load(open(HOME + configfile, 'r'))
+        config = json.load(open(HOME + configfile, 'r'))
         sql = sqlite3.connect(HOME + config['local_db'])
         cur = sql.cursor()
         cur.execute(u'SELECT category, COUNT(article) FROM articles GROUP BY category')
