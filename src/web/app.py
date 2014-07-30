@@ -57,7 +57,9 @@ def show_api():
         cats = []
         for cat in cur.fetchall():
             cur2.execute(u'SELECT membercount, ts FROM stats WHERE category=? ORDER BY ts DESC LIMIT 20', [cat[0]])
-            stats = cur2.fetchall()
+            stats = []
+            for s in cur2.fetchall():
+                stats.append({'value': s[0], 'timestamp': s[1]})
             cats.append({'name': cat[0], 'membercount': stats})
         p = {
             'host': config['host'],
