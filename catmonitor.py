@@ -84,8 +84,8 @@ def get_live(catname, exceptions):
     #pbar = ProgressBar(maxval=config['maxcats'], widgets=['Categories: ', Counter()])
     #pbar.start()
 
-    cats = [catname];
-    articles = [];
+    cats = [catname]
+    articles = []
     for catname in cats:
         cur.execute('SELECT page.page_title, page.page_namespace, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=1 OR page.page_namespace=14)', [catname.encode('utf-8')])
         for row in cur.fetchall():
@@ -228,7 +228,7 @@ try:
         logger.info("Checking: %s", page.page_title)
         #if page.page_title != u'DanmicholoBot/Sandkasse2':
         #    continue
-        txt = page.edit()
+        txt = page.text()
         te = TemplateEditor(txt)
         template = te.templates[config['template']][0]
         
