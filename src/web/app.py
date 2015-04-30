@@ -6,16 +6,17 @@ from time import time
 import re
 import sqlite3
 
-import simplejson as json
+import json
 import flask
+from flask import request
 
 app = flask.Flask(__name__)
 
 HOME = '/data/project/catmonitor/'
 
-def error_404():
-    return '404'
-    response = flask.render_template('404.html')
+@app.errorhandler(404)
+def error_404(e):
+    response = flask.jsonify(error='invalid route', route=request.path)
     response.status_code = 404
     return response
 
