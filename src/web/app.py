@@ -20,30 +20,7 @@ def error_404(e):
     response.status_code = 404
     return response
 
-
-@app.route('/')
-def show_index():
-
-    configs = ['config.no.json', 'config.nn.json']
-    projects = []
-
-    for configfile in configs:
-        config = json.load(open(HOME + configfile, 'r'))
-        sql = sqlite3.connect(HOME + config['local_db'])
-        cur = sql.cursor()
-        cur.execute(u'SELECT category, COUNT(article) FROM articles GROUP BY category')
-        p = {
-            'host': config['host'],
-            'template': config['template'],
-            'cats': [[r[0], r[1]] for r in cur.fetchall()]
-        }
-        projects.append(p)
-        cur.close()
-
-    return flask.render_template('main.html', projects=projects)
-
-
-@app.route('/api')
+@app.route('/catmonitor/api')
 def show_api():
 
     configs = ['config.no.json', 'config.nn.json']
