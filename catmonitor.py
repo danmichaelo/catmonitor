@@ -24,7 +24,7 @@ args = parser.parse_args()
 config = json.load(open(args.config, 'r'))
 
 sql = sqlite3.connect(config['local_db'])
-no = mwclient.Site(config['host'], clients_useragent='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__)
+no = mwclient.Site(('https', config['host']), clients_useragent='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__)
 no.login(config['user'], config['pwd'])
 
 
