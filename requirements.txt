@@ -5,4 +5,5 @@ mwtemplates
 mwclient
 oursql
 git+git://github.com/danmichaelo/eximhandler.git
+requests[security]
 
