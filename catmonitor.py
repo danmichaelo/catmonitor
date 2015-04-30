@@ -10,7 +10,8 @@ from mwtemplates import TemplateEditor
 import logging
 import logging.handlers
 import argparse
-import simplejson as json
+import json
+import platform
 
 from eximhandler import EximHandler
 
@@ -220,7 +221,8 @@ def total_seconds(td):
 runstart = datetime.now()
 import platform
 pv = platform.python_version()
-logger.info('running Python %s' % (pv))
+distro = platform.linux_distribution()
+logger.info('running Python %s on %s %s %s', pv, *distro)
 template = no.pages[config['template']]
 try:
 
