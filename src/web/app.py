@@ -4,7 +4,8 @@ from __future__ import unicode_literals
 
 from time import time
 import re
-import sqlite3
+import os
+import oursql
 
 import json
 import flask
@@ -28,7 +29,11 @@ def show_api():
 
     for configfile in configs:
         config = json.load(open(HOME + configfile, 'r'))
-        sql = sqlite3.connect(HOME + config['local_db'])
+        sql = oursql.connect(host=config['local_db']['host'],
+                             db=config['local_db']['db'],
+                             charset='utf8',
+                             use_unicode=True,
+                             read_default_file=os.path.expanduser('~/replica.my.cnf'))
         cur = sql.cursor()
         cur2 = sql.cursor()
         cur.execute(u'SELECT category, COUNT(article) FROM articles GROUP BY category')
