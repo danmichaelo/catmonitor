@@ -18,16 +18,16 @@ CREATE TABLE articles (
   PRIMARY KEY (category, article),
   KEY date_added (date_added),
   KEY date_created (date_created)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 DEFAULT COLLATE=utf8_bin ;
 
 CREATE TABLE stats (
-  id int(12) PRIMARY KEY,
+  id int(12) PRIMARY KEY AUTO_INCREMENT,
   category varchar(255) NOT NULL,
-  ts DATE NOT NULL,
+  ts DATETIME NOT NULL,
   membercount int(8),
   KEY category (category),
   KEY ts (ts)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 DEFAULT COLLATE=utf8_bin ;
 
 END
 
