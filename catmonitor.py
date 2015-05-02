@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 config = json.load(open(args.config, 'r'))
 
-sql = oursql.connect(host=config['local_db']['host'], db=config['local_db']['db'], charset=None, use_unicode=False,
+sql = oursql.connect(host=config['local_db']['host'], db=config['local_db']['db'], charset='utf8', use_unicode=True,
         read_default_file=os.path.expanduser('~/replica.my.cnf'))
 
 # sql = sqlite3.connect(config['local_db'])
