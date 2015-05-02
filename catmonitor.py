@@ -27,8 +27,9 @@ sql = oursql.connect(host=config['local_db']['host'], db=config['local_db']['db'
         read_default_file=os.path.expanduser('~/replica.my.cnf'))
 
 # sql = sqlite3.connect(config['local_db'])
-no = mwclient.Site(('https', config['host']), clients_useragent='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__)
-no.login(config['user'], config['pwd'])
+site = mwclient.Site(('https', config['host']), clients_useragent='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__)
+site.login(config['user'], config['pwd'])
+wiki = site.site['wikiid']
 
 
 logger = logging.getLogger()
@@ -59,7 +60,7 @@ if not args.silent:
     logger.addHandler(console_handler)
 
 def get_date_created(article):
-    o = no.api('query', prop='revisions', rvlimit=1, rvdir='newer', titles=article)['query']['pages'].itervalues().next()
+    o = site.api('query', prop='revisions', rvlimit=1, rvdir='newer', titles=article)['query']['pages'].itervalues().next()
     if not 'revisions' in o:
         logger.error(u"Could not find first revision for article %s", article)
         return False
@@ -74,7 +75,7 @@ def get_date_created(article):
 def get_cached(catname):
     cur = sql.cursor()
     articles = []
-    cur.execute(u'SELECT article FROM articles WHERE category=?', [catname])
+    cur.execute(u'SELECT article FROM articles WHERE wiki=? AND category=?', [wiki, catname])
     articles = [r[0] for r in cur.fetchall()]
     cur.close()
     return articles
@@ -130,12 +131,12 @@ def update_cache(cached, live):
     
     cur = sql.cursor()
     for article in removed:
-        cur.execute(u'DELETE FROM articles WHERE category=? AND article=?', [catname, article])
+        cur.execute(u'DELETE FROM articles WHERE wiki=? AND category=? AND article=?', [wiki, catname, article])
     
     for article in added:
         #created = get_date_created(article)
         #if created != False:
-        cur.execute(u'INSERT INTO articles (category, article, date_added) VALUES (?,?,?)', [catname, article, now])
+        cur.execute(u'INSERT INTO articles (wiki, category, article, date_added) VALUES (?,?,?,?)', [wiki, catname, article, now])
 
     sql.commit()
     cur.close()
@@ -144,10 +145,10 @@ def update_stats(catname):
     now = datetime.now().strftime('%F %T')
     
     cur = sql.cursor()
-    cur.execute(u'SELECT COUNT(*) FROM articles WHERE category=?', [catname])
+    cur.execute(u'SELECT COUNT(*) FROM articles WHERE wiki=? AND category=?', [wiki, catname])
     membercount = cur.fetchall()[0][0]
     
-    cur.execute(u'INSERT INTO stats (category, ts, membercount) VALUES (?,?,?)', [catname, now, membercount])
+    cur.execute(u'INSERT INTO stats (wiki, category, ts, membercount) VALUES (?,?,?,?)', [wiki, catname, now, membercount])
     sql.commit()
     cur.close()
 
@@ -191,7 +192,7 @@ def makelist(catname, txt, maxitems, header, articlecount, date_tpl, separator):
     if header != '':
         ntxt = '\n' + header % { 'category': catname, 'articlecount': articlecount }
     cur = sql.cursor()
-    cur.execute(u'SELECT article, date_created FROM articles WHERE category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [catname])
+    cur.execute(u'SELECT article, date_created FROM articles WHERE wiki=? AND category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [wiki, catname])
     #cdate = ''
     buf = { 'dato': '', 'artikler': '' }
     for r in cur.fetchall():
@@ -226,7 +227,7 @@ import platform
 pv = platform.python_version()
 distro = platform.linux_distribution()
 logger.info('running Python %s on %s %s %s', pv, *distro)
-template = no.pages[config['template']]
+template = site.pages[config['template']]
 try:
 
     for page in template.embeddedin():
@@ -262,7 +263,7 @@ try:
         if 'skille_mal' in template.parameters:
             sep = template.parameters['skille_mal'].value
         
-        cat = no.categories[catname]
+        cat = site.categories[catname]
         if cat.exists:
 
             catname = catname.replace(' ', '_')
@@ -270,7 +271,7 @@ try:
             articlecount = update(catname, exceptions = utelat)
 
             cur = sql.cursor()
-            cur.execute(u'SELECT article FROM articles WHERE category=? AND date_created IS NULL', [catname])
+            cur.execute(u'SELECT article FROM articles WHERE wiki=? AND category=? AND date_created IS NULL', [wiki, catname])
             articles = [r[0] for r in cur.fetchall()]
             if len(articles) > 0:
                 logger.info("Backfillling creation dates for %d articles (this may take a long while)", len(articles))
@@ -279,7 +280,7 @@ try:
                     try:
                         created = get_date_created(article)
                         if created:
-                            cur.execute(u'UPDATE articles set date_created=? WHERE article=?', [created, article])
+                            cur.execute(u'UPDATE articles set date_created=? WHERE wiki=? AND article=?', [created, wiki, article])
                             sql.commit()
                     except ValueError:
                         logger.error(u"Could not fetch date for %s", article)

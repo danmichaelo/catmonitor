@@ -5,7 +5,10 @@
     "template": "Bruker:DanmicholoBot/Kategoriovervåkning",
     "edit_summary": "Oppdaterer liste over nye artikler",
     "maxcats": 10000 ,
-    "local_db": "catmonitor.no.db",
+    "local_db": {
+        "host": "tools-db",
+        "db": "SOME-USERNAME__catmonitor"
+    },
     "mysql": {
         "host": "nowiki.labsdb",
         "db": "nowiki_p"
