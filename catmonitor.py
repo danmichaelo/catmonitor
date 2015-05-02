@@ -23,7 +23,10 @@ args = parser.parse_args()
 
 config = json.load(open(args.config, 'r'))
 
-sql = sqlite3.connect(config['local_db'])
+sql = oursql.connect(host=config['local_db']['host'], db=config['local_db']['db'], charset=None, use_unicode=False,
+        read_default_file=os.path.expanduser('~/replica.my.cnf'))
+
+# sql = sqlite3.connect(config['local_db'])
 no = mwclient.Site(('https', config['host']), clients_useragent='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__)
 no.login(config['user'], config['pwd'])
 
