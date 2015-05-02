@@ -197,8 +197,8 @@ def makelist(catname, txt, maxitems, header, articlecount, date_tpl, separator):
     for r in cur.fetchall():
         #if r[1] != mindate:
         #logger.info("article date is %s", r[1])
-        d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
-        d = d.strftime('%d.%m')
+        # d = datetime.strptime(r[1], '%Y-%m-%d %H:%M:%S')
+        d = r[1].strftime('%d.%m')
         if d != buf['dato']:
             if buf['artikler'] != '':
                 ntxt += '\n' + date_tpl % buf 
