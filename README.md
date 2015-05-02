@@ -12,27 +12,7 @@ Install [Bower](//github.com/bower/bower) components:
 bower install
 ```
 
-Run <code>sqlite3 catmonitor.db</code> and 
-````
-CREATE TABLE articles (
-  category TEXT NOT NULL,
-  article TEXT NOT NULL,
-  date_added DATE NOT NULL, 
-  date_created DATE,
-  PRIMARY KEY (category,article)
-);
-CREATE INDEX date_added ON articles(date_added);
-CREATE INDEX date_created ON articles(date_created);
-
-CREATE TABLE stats (
-  id INTEGER PRIMARY KEY,
-  category TEXT NOT NULL,
-  ts DATE NOT NULL,
-  membercount INTEGER
-);
-CREATE INDEX category ON stats(category);
-CREATE INDEX ts ON stats(ts);
-````
+Run `./migrations/2015-05-02-init.sh` to initialize the MySQL database and create tables.
 
 Setup a virtualenv and install deps: 
 <pre>
