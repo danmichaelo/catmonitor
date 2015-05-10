@@ -59,10 +59,10 @@ if not args.silent:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-def get_date_created(article):
-    o = site.api('query', prop='revisions', rvlimit=1, rvdir='newer', titles=article)['query']['pages'].itervalues().next()
+def get_date_created(article_id):
+    o = site.api('query', prop='revisions', rvlimit=1, rvdir='newer', pageids=article_id)['query']['pages'].itervalues().next()
     if not 'revisions' in o:
-        logger.error(u"Could not find first revision for article %s", article)
+        logger.error(u"Could not find first revision for article %s", article_id)
         return False
     
     ts = o['revisions'][0]['timestamp']
@@ -73,14 +73,16 @@ def get_date_created(article):
     return ts
 
 def get_cached(catname):
+    # Returns a dict with article ids as keys and article titles as values
     cur = sql.cursor()
-    articles = []
-    cur.execute(u'SELECT article FROM articles WHERE wiki=? AND category=?', [wiki, catname])
-    articles = [r[0] for r in cur.fetchall()]
+    cur.execute(u'SELECT article_id, article_title FROM articles WHERE wiki=? AND category=?', [wiki, catname])
+    articles = {int(r[0]): r[1] for r in cur.fetchall()}
     cur.close()
     return articles
 
 def get_live(catname, exceptions):
+    # Returns a dict with article ids as keys and article titles as values
+
     # The text in the DB is UTF-8, but identified as latin1, so we need to be careful
     db = oursql.connect(host=config['mysql']['host'], db=config['mysql']['db'], charset=None, use_unicode=False,
             read_default_file=os.path.expanduser('~/replica.my.cnf'))   
@@ -90,19 +92,20 @@ def get_live(catname, exceptions):
     #pbar.start()
 
     cats = [catname]
-    articles = []
+    articles = {}
     for catname in cats:
-        cur.execute('SELECT page.page_title, page.page_namespace, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=1 OR page.page_namespace=14)', [catname.encode('utf-8')])
+        cur.execute('SELECT page.page_id, page.page_title, page.page_namespace, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=1 OR page.page_namespace=14)', [catname.encode('utf-8')])
         for row in cur.fetchall():
-            if row[2] == 'subcat':
-                cat = row[0].decode('utf-8')
+            if row[3] == 'subcat':
+                cat = row[1].decode('utf-8')
                 if cat not in exceptions and cat not in cats:
                     cats.append(cat)
                     #print cat
-            elif row[2] == 'page':
-                pg = row[0].decode('utf-8')
+            elif row[3] == 'page':
+                pg_id = int(row[0])
+                pg = row[1].decode('utf-8')
                 #if pg not in articles: expensive!
-                articles.append(pg)
+                articles[pg_id] = pg
         if len(cats) > config['maxcats']:
             raise StandardError("Too many categories. We should probably add exclusions")
         #    pbar.maxval = len(cats)
@@ -110,8 +113,7 @@ def get_live(catname, exceptions):
     #pbar.maxval = len(cats)
     #pbar.finish()
 
-    articles = list(set(articles))
-    logger.info(" -> Found %d cats, %d articles", len(cats), len(articles))
+    logger.info(" -> Found %d cats, %d articles", len(cats), len(articles.keys()))
     #logger.info("of which %d unique articles", len(articles))
     cur.close()
     db.close()
@@ -120,23 +122,24 @@ def get_live(catname, exceptions):
 def update_cache(cached, live):
     now = datetime.now().strftime('%F %T')
 
-    cached_set = set(cached)
-    live_set = set(live)
+    cached_set = set(cached.keys())
+    live_set = set(live.keys())
 
     added = list(live_set.difference(cached_set))
     removed = list(cached_set.difference(live_set))
 
-    logger.info(" -> %d articles in cache, %d articles live", len(cached), len(live))
+    logger.info(" -> %d articles in cache, %d articles live", len(cached.keys()), len(live.keys()))
     logger.info(" -> %d articles added, %d articles removed", len(added), len(removed))
     
     cur = sql.cursor()
-    for article in removed:
-        cur.execute(u'DELETE FROM articles WHERE wiki=? AND category=? AND article=?', [wiki, catname, article])
+
+    for article_id in removed:
+        cur.execute(u'DELETE FROM articles WHERE wiki=? AND category=? AND article_id=?', [wiki, catname, article_id])
     
-    for article in added:
+    for article_id in added:
         #created = get_date_created(article)
         #if created != False:
-        cur.execute(u'INSERT INTO articles (wiki, category, article, date_added) VALUES (?,?,?,?)', [wiki, catname, article, now])
+        cur.execute(u'INSERT INTO articles (wiki, category, article_id, article_title, date_added) VALUES (?,?,?,?,?)', [wiki, catname, article_id, live[article_id], now])
 
     sql.commit()
     cur.close()
@@ -192,7 +195,7 @@ def makelist(catname, txt, maxitems, header, articlecount, date_tpl, separator):
     if header != '':
         ntxt = '\n' + header % { 'category': catname, 'articlecount': articlecount }
     cur = sql.cursor()
-    cur.execute(u'SELECT article, date_created FROM articles WHERE wiki=? AND category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [wiki, catname])
+    cur.execute(u'SELECT article_title, date_created FROM articles WHERE wiki=? AND category=? ORDER BY date_created DESC LIMIT %s' % maxitems, [wiki, catname])
     #cdate = ''
     buf = { 'dato': '', 'artikler': '' }
     for r in cur.fetchall():
@@ -271,19 +274,19 @@ try:
             articlecount = update(catname, exceptions = utelat)
 
             cur = sql.cursor()
-            cur.execute(u'SELECT article FROM articles WHERE wiki=? AND category=? AND date_created IS NULL', [wiki, catname])
+            cur.execute(u'SELECT article_id FROM articles WHERE wiki=? AND category=? AND date_created IS NULL', [wiki, catname])
             articles = [r[0] for r in cur.fetchall()]
             if len(articles) > 0:
                 logger.info("Backfillling creation dates for %d articles (this may take a long while)", len(articles))
-                for article in articles:
+                for article_id in articles:
                     #logger.info(article)
                     try:
-                        created = get_date_created(article)
+                        created = get_date_created(article_id)
                         if created:
-                            cur.execute(u'UPDATE articles set date_created=? WHERE wiki=? AND article=?', [created, wiki, article])
+                            cur.execute(u'UPDATE articles set date_created=? WHERE wiki=? AND article_id=?', [created, wiki, article_id])
                             sql.commit()
                     except ValueError:
-                        logger.error(u"Could not fetch date for %s", article)
+                        logger.error(u"Could not fetch date for %s", article_id)
             cur.close()
             txt = makelist(catname, txt, maxitems = antall, header=overskrift, articlecount=articlecount, date_tpl=dato_mal, separator=sep)
             page.save(txt, config['edit_summary'])
