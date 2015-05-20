@@ -195,7 +195,7 @@ def makelist(catname, txt, maxitems, header, articlecount, date_tpl, separator):
     if header != '':
         ntxt = '\n' + header % { 'category': catname, 'articlecount': articlecount }
     cur = sql.cursor()
-    cur.execute(u'SELECT article_title, date_created FROM articles WHERE wiki=? AND category=? GROUP BY article_title ORDER BY date_created DESC LIMIT %s' % maxitems, [wiki, catname])
+    cur.execute(u'SELECT article_title, date_created FROM articles WHERE wiki=? AND category=? GROUP BY article_title ORDER BY date_created, article_title DESC LIMIT %s' % maxitems, [wiki, catname])
     #cdate = ''
     buf = { 'dato': '', 'artikler': '' }
     for r in cur.fetchall():
