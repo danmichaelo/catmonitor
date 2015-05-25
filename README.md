@@ -12,7 +12,7 @@ Install [Bower](//github.com/bower/bower) components:
 bower install
 ```
 
-Run `./migrations/2015-05-02-init.sh` to initialize the MySQL database and create tables.
+Run `./migrations/*.sh` to initialize the MySQL database and create tables.
 
 Setup a virtualenv and install deps: 
 <pre>

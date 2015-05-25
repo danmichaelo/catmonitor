@@ -92,6 +92,7 @@ def get_live(catname, exceptions):
     #pbar.start()
 
     cats = [catname]
+    parents = {catname: None}
     articles = {}
     for catname in cats:
         cur.execute('SELECT page.page_id, page.page_title, page.page_namespace, categorylinks.cl_type FROM categorylinks,page WHERE categorylinks.cl_to=? AND categorylinks.cl_from=page.page_id AND (page.page_namespace=0 OR page.page_namespace=1 OR page.page_namespace=14)', [catname.encode('utf-8')])
@@ -99,13 +100,23 @@ def get_live(catname, exceptions):
             if row[3] == 'subcat':
                 cat = row[1].decode('utf-8')
                 if cat not in exceptions and cat not in cats:
+                    parents[cat] = catname
                     cats.append(cat)
                     #print cat
             elif row[3] == 'page':
                 pg_id = int(row[0])
                 pg = row[1].decode('utf-8')
                 #if pg not in articles: expensive!
-                articles[pg_id] = pg
+                path = [pg]
+                x = catname
+                n = 0
+                while x is not None:
+                    path.append(x)
+                    x = parents[x]
+                    n += 1
+                    if n > 50:
+                        break
+                articles[pg_id] = path
         if len(cats) > config['maxcats']:
             raise StandardError("Too many categories. We should probably add exclusions")
         #    pbar.maxval = len(cats)
@@ -139,7 +150,7 @@ def update_cache(cached, live):
     for article_id in added:
         #created = get_date_created(article)
         #if created != False:
-        cur.execute(u'INSERT INTO articles (wiki, category, article_id, article_title, date_added) VALUES (?,?,?,?,?)', [wiki, catname, article_id, live[article_id], now])
+        cur.execute(u'INSERT INTO articles (wiki, category, article_id, article_title, article_path, date_added) VALUES (?,?,?,?,?,?)', [wiki, catname, article_id, live[article_id][-1], ' > '.join(live[article_id]), now])
 
     sql.commit()
     cur.close()
