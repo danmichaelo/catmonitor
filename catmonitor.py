@@ -150,7 +150,7 @@ def update_cache(cached, live):
     for article_id in added:
         #created = get_date_created(article)
         #if created != False:
-        cur.execute(u'INSERT INTO articles (wiki, category, article_id, article_title, article_path, date_added) VALUES (?,?,?,?,?,?)', [wiki, catname, article_id, live[article_id][-1], ' > '.join(live[article_id]), now])
+        cur.execute(u'INSERT INTO articles (wiki, category, article_id, article_title, article_path, date_added) VALUES (?,?,?,?,?,?)', [wiki, catname, article_id, live[article_id][0], ' > '.join(live[article_id]), now])
 
     sql.commit()
     cur.close()
