@@ -27,8 +27,8 @@ sql = oursql.connect(host=config['local_db']['host'], db=config['local_db']['db'
         read_default_file=os.path.expanduser('~/replica.my.cnf'), autoreconnect=True)
 
 # sql = sqlite3.connect(config['local_db'])
-site = mwclient.Site(('https', config['host']), clients_useragent='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__)
-site.login(config['user'], config['pwd'])
+ua='CatMonitor. Run by User:Danmichaelo. Based on mwclient/%s' % mwclient.__ver__
+site = mwclient.Site(clients_useragent=ua, **config['site'])
 wiki = site.site['wikiid']
 
 

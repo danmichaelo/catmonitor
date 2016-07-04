@@ -1,7 +1,11 @@
 {
-    "host": "no.wikipedia.org" ,
-    "user": "USER",
-    "pwd": "PASS",
+    "site": {
+        "host": "no.wikipedia.org",
+        "consumer_token": "TOKEN",
+        "consumer_secret": "SECRET",
+        "access_token": "TOKEN",
+        "access_secret": "SECRET"
+    },
     "template": "Bruker:DanmicholoBot/Kategoriovervåkning",
     "edit_summary": "Oppdaterer liste over nye artikler",
     "maxcats": 10000 ,
